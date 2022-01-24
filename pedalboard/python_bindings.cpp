@@ -30,6 +30,7 @@ namespace py = pybind11;
 #include "ExternalPlugin.h"
 #include "JucePlugin.h"
 #include "Plugin.h"
+#include "PluginContainer.h"
 #include "process.h"
 
 #include "plugins/AddLatency.h"
@@ -51,8 +52,6 @@ namespace py = pybind11;
 #include "plugins/Reverb.h"
 
 using namespace Pedalboard;
-
-static constexpr int DEFAULT_BUFFER_SIZE = 8192;
 
 PYBIND11_MODULE(pedalboard_native, m) {
   m.def("process", process<float>,
@@ -83,9 +82,10 @@ PYBIND11_MODULE(pedalboard_native, m) {
         py::arg("buffer_size") = DEFAULT_BUFFER_SIZE, py::arg("reset") = true);
 
   auto plugin =
-      py::class_<Plugin>(m, "Plugin",
-                         "A generic audio processing plugin. Base class of all "
-                         "Pedalboard plugins.")
+      py::class_<Plugin, std::shared_ptr<Plugin>>(
+          m, "Plugin",
+          "A generic audio processing plugin. Base class of all "
+          "Pedalboard plugins.")
           .def(py::init([]() {
             throw py::type_error(
                 "Plugin is an abstract base class - don't instantiate this "
@@ -103,7 +103,7 @@ PYBIND11_MODULE(pedalboard_native, m) {
               "cause a full re-instantiation of the plugin.")
           .def(
               "process",
-              [](Plugin *self,
+              [](std::shared_ptr<Plugin> self,
                  const py::array_t<float, py::array::c_style> inputArray,
                  double sampleRate, unsigned int bufferSize, bool reset) {
                 return process(inputArray, sampleRate, {self}, bufferSize,
@@ -118,7 +118,7 @@ PYBIND11_MODULE(pedalboard_native, m) {
 
           .def(
               "process",
-              [](Plugin *self,
+              [](std::shared_ptr<Plugin> self,
                  const py::array_t<double, py::array::c_style> inputArray,
                  double sampleRate, unsigned int bufferSize, bool reset) {
                 const py::array_t<float, py::array::c_style> float32InputArray =
@@ -129,14 +129,14 @@ PYBIND11_MODULE(pedalboard_native, m) {
               "Run a 64-bit floating point audio buffer through this plugin."
               "(Note: if calling this multiple times with multiple plugins, "
               "consider using pedalboard.process(...) instead.) The buffer "
-              "will be "
-              "converted to 32-bit for processing.",
+              "will be converted to 32-bit for processing.",
               py::arg("input_array"), py::arg("sample_rate"),
               py::arg("buffer_size") = DEFAULT_BUFFER_SIZE,
               py::arg("reset") = true);
   plugin.attr("__call__") = plugin.attr("process");
 
-  
+  init_plugin_container(m);
+
   init_chorus(m);
   init_compressor(m);
   init_convolution(m);

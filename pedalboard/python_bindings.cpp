@@ -158,7 +158,7 @@ PYBIND11_MODULE(pedalboard_native, m) {
   py::module utils = m.def_submodule("utils");
   init_mix(utils);
   init_chain(utils);
-  
+
   // Internal plugins for testing, debugging, etc:
   py::module internal = m.def_submodule("_internal");
   init_add_latency(internal);
